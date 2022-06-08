@@ -6,9 +6,9 @@ edition = "2021"
 build = "build.rs"
 default-run = "hbbs"
 
-[[bin]]
-name = "hbbr"
-path = "src/hbbr.rs"
+#[[bin]]
+#name = "hbbr"
+#path = "src/hbbr.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

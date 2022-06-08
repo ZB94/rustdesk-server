@@ -1,5 +1,12 @@
-use crate::common::*;
-use crate::peer::*;
+use std::{
+    collections::HashMap,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    sync::Arc,
+    time::Instant,
+};
+
+use sodiumoxide::crypto::sign;
+
 use hbb_common::{
     allow_err,
     bytes::{Bytes, BytesMut},
@@ -28,13 +35,10 @@ use hbb_common::{
     udp::FramedSocket,
     AddrMangle, ResultType,
 };
-use sodiumoxide::crypto::sign;
-use std::{
-    collections::HashMap,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    sync::Arc,
-    time::Instant,
-};
+
+use crate::common::*;
+use crate::peer::*;
+
 const ADDR_127: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
 
 #[derive(Clone, Debug)]
@@ -81,12 +85,7 @@ enum LoopFailure {
 
 impl RendezvousServer {
     #[tokio::main(flavor = "multi_thread")]
-    pub async fn start(
-        port: i32,
-        serial: i32,
-        key: &str,
-        rmem: usize,
-    ) -> ResultType<()> {
+    pub async fn start(port: i32, serial: i32, key: &str, rmem: usize) -> ResultType<()> {
         let addr = format!("0.0.0.0:{}", port);
         let addr2 = format!("0.0.0.0:{}", port - 1);
         let addr3 = format!("0.0.0.0:{}", port + 2);
@@ -501,8 +500,27 @@ impl RendezvousServer {
                     msg_out.set_test_nat_response(res);
                     Self::send_to_sink(sink, msg_out).await;
                 }
-                Some(rendezvous_message::Union::register_pk(_rk)) => {
-                    let res = register_pk_response::Result::NOT_SUPPORT;
+                Some(rendezvous_message::Union::register_pk(rk)) => {
+                    let res = if self.pm.get(&rk.id).await.is_some() {
+                        register_pk_response::Result::ID_EXISTS
+                    } else {
+                        match self.pm.get(&rk.old_id).await {
+                            Some(peer) => {
+                                let pk = peer.read().await.pk.clone();
+                                self.pm
+                                    .update_pk(
+                                        rk.id,
+                                        peer,
+                                        addr,
+                                        rk.uuid,
+                                        pk,
+                                        addr.ip().to_string(),
+                                    )
+                                    .await
+                            }
+                            None => register_pk_response::Result::SERVER_ERROR,
+                        }
+                    };
                     let mut msg_out = RendezvousMessage::new();
                     msg_out.set_register_pk_response(RegisterPkResponse {
                         result: res.into(),
@@ -1012,21 +1030,12 @@ impl RendezvousServer {
         });
     }
 
-    async fn handle_listener(
-        &self,
-        stream: TcpStream,
-        addr: SocketAddr,
-        key: &str,
-        ws: bool,
-    ) {
+    async fn handle_listener(&self, stream: TcpStream, addr: SocketAddr, key: &str, ws: bool) {
         log::debug!("Tcp connection from {:?}, ws: {}", addr, ws);
         let mut rs = self.clone();
         let key = key.to_owned();
         tokio::spawn(async move {
-            allow_err!(
-                rs.handle_listener_inner(stream, addr, &key, ws)
-                    .await
-            );
+            allow_err!(rs.handle_listener_inner(stream, addr, &key, ws).await);
         });
     }
 
@@ -1046,10 +1055,7 @@ impl RendezvousServer {
             while let Ok(Some(Ok(msg))) = timeout(30_000, b.next()).await {
                 match msg {
                     tungstenite::Message::Binary(bytes) => {
-                        if !self
-                            .handle_tcp(&bytes, &mut sink, addr, key, ws)
-                            .await
-                        {
+                        if !self.handle_tcp(&bytes, &mut sink, addr, key, ws).await {
                             break;
                         }
                     }
@@ -1060,10 +1066,7 @@ impl RendezvousServer {
             let (a, mut b) = Framed::new(stream, BytesCodec::new()).split();
             sink = Some(Sink::TcpStream(a));
             while let Ok(Some(Ok(bytes))) = timeout(30_000, b.next()).await {
-                if !self
-                    .handle_tcp(&bytes, &mut sink, addr, key, ws)
-                    .await
-                {
+                if !self.handle_tcp(&bytes, &mut sink, addr, key, ws).await {
                     break;
                 }
             }

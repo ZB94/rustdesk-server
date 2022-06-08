@@ -1,10 +1,7 @@
 use clap::App;
-mod common;
-mod relay_server;
 use flexi_logger::*;
 use hbb_common::{config::RELAY_PORT, ResultType};
-use relay_server::*;
-mod version;
+use hbbs::relay_server::start;
 
 fn main() -> ResultType<()> {
     let _logger = Logger::try_with_env_or_str("info")?
@@ -19,7 +16,7 @@ fn main() -> ResultType<()> {
         RELAY_PORT,
     );
     let matches = App::new("hbbr")
-        .version(version::VERSION)
+        .version(hbbs::version::VERSION)
         .author("Purslane Ltd. <info@rustdesk.com>")
         .about("RustDesk Relay Server")
         .args_from_usage(&args)
