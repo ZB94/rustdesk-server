@@ -117,7 +117,7 @@ impl RendezvousServer {
         let key = rs.get_server_sk(key);
         std::env::set_var("PORT_FOR_API", port.to_string());
         rs.parse_relay_servers(&get_arg("relay-servers"));
-        let pm = rs.pm.clone();
+        // let pm = rs.pm.clone();
         let mut listener = new_listener(&addr, false).await?;
         let mut listener2 = new_listener(&addr2, false).await?;
         let mut listener3 = new_listener(&addr3, false).await?;
@@ -846,7 +846,7 @@ impl RendezvousServer {
         self.relay_servers = self.relay_servers0.clone();
     }
 
-    fn get_relay_server(&self, pa: IpAddr, pb: IpAddr) -> String {
+    fn get_relay_server(&self, _pa: IpAddr, _pb: IpAddr) -> String {
         if self.relay_servers.is_empty() {
             return "".to_owned();
         } else if self.relay_servers.len() == 1 {
@@ -1190,12 +1190,12 @@ async fn test_hbbs(addr: SocketAddr) -> ResultType<()> {
     }
 }
 
-#[inline]
-fn distance(a: &(i32, i32), b: &(i32, i32)) -> i32 {
-    let dx = a.0 - b.0;
-    let dy = a.1 - b.1;
-    dx * dx + dy * dy
-}
+// #[inline]
+// fn distance(a: &(i32, i32), b: &(i32, i32)) -> i32 {
+//     let dx = a.0 - b.0;
+//     let dy = a.1 - b.1;
+//     dx * dx + dy * dy
+// }
 
 #[inline]
 async fn send_rk_res(

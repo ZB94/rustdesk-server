@@ -25,15 +25,17 @@ pub(crate) struct PeerInfo {
     pub(crate) ip: String,
 }
 
-#[derive(Clone, Debug)]
+// #[derive(Clone, Debug)]
 pub(crate) struct Peer {
     pub(crate) socket_addr: SocketAddr,
     pub(crate) last_reg_time: Instant,
     pub(crate) guid: Vec<u8>,
     pub(crate) uuid: Vec<u8>,
     pub(crate) pk: Vec<u8>,
+    #[allow(unused)]
     pub(crate) user: Option<Vec<u8>>,
     pub(crate) info: PeerInfo,
+    #[allow(unused)]
     pub(crate) disabled: bool,
     pub(crate) reg_pk: (u32, Instant), // how often register_pk
 }
@@ -177,9 +179,9 @@ impl PeerMap {
     pub(crate) async fn is_in_memory(&self, id: &str) -> bool {
         self.map.read().await.contains_key(id)
     }
-
-    #[inline]
-    pub(crate) async fn remove(&self, id: &str) {
-        self.map.write().await.remove(id);
-    }
+    //
+    // #[inline]
+    // pub(crate) async fn remove(&self, id: &str) {
+    //     self.map.write().await.remove(id);
+    // }
 }

@@ -1,16 +1,13 @@
 use async_trait::async_trait;
 use hbb_common::{log, ResultType};
-use serde_json::value::Value;
 use sqlx::{
     sqlite::SqliteConnectOptions, ConnectOptions, Connection, Error as SqlxError, SqliteConnection,
 };
 use std::{ops::DerefMut, str::FromStr};
-//use sqlx::postgres::PgPoolOptions;
-//use sqlx::mysql::MySqlPoolOptions;
 
-pub(crate) type DB = sqlx::Sqlite;
-pub(crate) type MapValue = serde_json::map::Map<String, Value>;
-pub(crate) type MapStr = std::collections::HashMap<String, String>;
+// pub(crate) type DB = sqlx::Sqlite;
+// pub(crate) type MapValue = serde_json::map::Map<String, Value>;
+// pub(crate) type MapStr = std::collections::HashMap<String, String>;
 type Pool = deadpool::managed::Pool<DbPool>;
 
 pub struct DbPool {
@@ -107,30 +104,30 @@ impl Database {
         .await?)
     }
 
-    pub async fn get_peer_id(&self, guid: &[u8]) -> ResultType<Option<String>> {
-        Ok(sqlx::query!("select id from peer where guid = ?", guid)
-            .fetch_optional(self.pool.get().await?.deref_mut())
-            .await?
-            .map(|x| x.id))
-    }
+    // pub async fn get_peer_id(&self, guid: &[u8]) -> ResultType<Option<String>> {
+    //     Ok(sqlx::query!("select id from peer where guid = ?", guid)
+    //         .fetch_optional(self.pool.get().await?.deref_mut())
+    //         .await?
+    //         .map(|x| x.id))
+    // }
 
-    #[inline]
-    pub async fn get_conn(&self) -> ResultType<deadpool::managed::Object<DbPool>> {
-        Ok(self.pool.get().await?)
-    }
+    // #[inline]
+    // pub async fn get_conn(&self) -> ResultType<deadpool::managed::Object<DbPool>> {
+    //     Ok(self.pool.get().await?)
+    // }
 
-    pub async fn update_peer(&self, payload: MapValue, guid: &[u8]) -> ResultType<()> {
-        let mut conn = self.get_conn().await?;
-        let mut tx = conn.begin().await?;
-        if let Some(v) = payload.get("note") {
-            let v = get_str(v);
-            sqlx::query!("update peer set note = ? where guid = ?", v, guid)
-                .execute(&mut tx)
-                .await?;
-        }
-        tx.commit().await?;
-        Ok(())
-    }
+    // pub async fn update_peer(&self, payload: MapValue, guid: &[u8]) -> ResultType<()> {
+    //     let mut conn = self.get_conn().await?;
+    //     let mut tx = conn.begin().await?;
+    //     if let Some(v) = payload.get("note") {
+    //         let v = get_str(v);
+    //         sqlx::query!("update peer set note = ? where guid = ?", v, guid)
+    //             .execute(&mut tx)
+    //             .await?;
+    //     }
+    //     tx.commit().await?;
+    //     Ok(())
+    // }
 
     pub async fn insert_peer(
         &self,
@@ -209,23 +206,23 @@ mod tests {
     }
 }
 
-#[inline]
-pub fn guid2str(guid: &Vec<u8>) -> String {
-    let mut bytes = [0u8; 16];
-    bytes[..].copy_from_slice(&guid);
-    uuid::Uuid::from_bytes(bytes).to_string()
-}
-
-pub(crate) fn get_str(v: &Value) -> Option<&str> {
-    match v {
-        Value::String(v) => {
-            let v = v.trim();
-            if v.is_empty() {
-                None
-            } else {
-                Some(v)
-            }
-        }
-        _ => None,
-    }
-}
+// #[inline]
+// pub fn guid2str(guid: &Vec<u8>) -> String {
+//     let mut bytes = [0u8; 16];
+//     bytes[..].copy_from_slice(&guid);
+//     uuid::Uuid::from_bytes(bytes).to_string()
+// }
+//
+// pub(crate) fn get_str(v: &Value) -> Option<&str> {
+//     match v {
+//         Value::String(v) => {
+//             let v = v.trim();
+//             if v.is_empty() {
+//                 None
+//             } else {
+//                 Some(v)
+//             }
+//         }
+//         _ => None,
+//     }
+// }
