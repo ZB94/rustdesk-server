@@ -56,7 +56,7 @@ impl DbPool {
     }
 }
 
-#[derive(Type)]
+#[derive(Debug, Type, Serialize, Deserialize, Eq, PartialEq, Hash)]
 #[repr(u8)]
 pub enum Permission {
     Admin = 0,

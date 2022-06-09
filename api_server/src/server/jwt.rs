@@ -1,3 +1,4 @@
+use crate::database::Permission;
 use crate::server::{LocalPeer, Response};
 use axum::extract::{FromRequest, RequestParts};
 use axum::http::StatusCode;
@@ -14,10 +15,11 @@ pub struct Claims {
     pub iss: String,
     pub nbf: usize,
     pub local_peer: LocalPeer,
+    pub perm: Permission,
 }
 
 impl Claims {
-    pub fn gen_token(username: String, local_peer: LocalPeer) -> String {
+    pub fn gen_user_token(username: String, local_peer: LocalPeer) -> String {
         let current = chrono::Utc::now();
         let claims = Self {
             exp: (current + chrono::Duration::days(30)).timestamp() as usize,
@@ -25,6 +27,7 @@ impl Claims {
             iss: username,
             nbf: current.timestamp() as usize,
             local_peer,
+            perm: Permission::User,
         };
 
         let header = jsonwebtoken::Header::new(ALGORITHM);

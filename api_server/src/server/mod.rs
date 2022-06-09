@@ -28,27 +28,35 @@ pub async fn start(bind: &SocketAddr, pool: DbPool) -> Result<(), axum::BoxError
 }
 
 #[instrument]
-async fn get_ab(_claims: Claims) -> Json<Response<GetAddressBook>> {
+async fn get_ab(claims: Claims) -> Json<Response<GetAddressBook>> {
     debug!("get address book");
-    Json(Response {
-        error: None,
-        data: Some(GetAddressBook {
-            updated_at: 0,
-            data: Default::default(),
-        }),
-    })
+    check_perm(&claims, None)
+        .map(|_| {
+            Json(Response {
+                error: None,
+                data: Some(GetAddressBook {
+                    updated_at: 0,
+                    data: Default::default(),
+                }),
+            })
+        })
+        .unwrap_or_else(Json)
 }
 
 #[instrument]
 async fn update_ab(
     Json(UpdateAddressBook { data: _data }): Json<UpdateAddressBook>,
-    _claims: Claims,
+    claims: Claims,
 ) -> Json<Response<()>> {
     debug!("update address book");
-    Json(Response {
-        error: None,
-        data: Some(()),
-    })
+    check_perm(&claims, None)
+        .map(|_| {
+            Json(Response {
+                error: None,
+                data: Some(()),
+            })
+        })
+        .unwrap_or_else(Json)
 }
 
 #[instrument(skip(pool))]
@@ -62,7 +70,7 @@ async fn login(Json(login): Json<Login>, pool: Extension<DbPool>) -> Json<Respon
             if user.disabled {
                 (Some("该账号已被禁用,请联系管理员".to_string()), None)
             } else {
-                let access_token = Claims::gen_token(login.username, login.local_peer);
+                let access_token = Claims::gen_user_token(login.username, login.local_peer);
                 (
                     None,
                     Some(LoginResponse {
@@ -91,23 +99,17 @@ async fn current_user(
 ) -> (StatusCode, Json<Response<User>>) {
     debug!("query current user");
 
-    if lp == claims.local_peer {
-        (
-            StatusCode::OK,
-            Json(Response {
-                error: None,
-                data: Some(User { name: claims.iss }),
-            }),
-        )
-    } else {
-        (
-            StatusCode::UNAUTHORIZED,
-            Json(Response {
-                error: Some("用户信息异常，请重新登录".to_string()),
-                data: None,
-            }),
-        )
-    }
+    check_perm(&claims, Some(&lp))
+        .map(|_| {
+            (
+                StatusCode::OK,
+                Json(Response {
+                    error: None,
+                    data: Some(User { name: claims.iss }),
+                }),
+            )
+        })
+        .unwrap_or_else(|r| (StatusCode::UNAUTHORIZED, Json(r)))
 }
 
 #[instrument]
@@ -210,5 +212,17 @@ mod ser_local_peer_uuid {
         S: Serializer,
     {
         base64::encode(uuid.to_string()).serialize(ser)
+    }
+}
+
+#[inline]
+fn check_perm<T>(claims: &Claims, lp: Option<&LocalPeer>) -> Result<(), Response<T>> {
+    if claims.perm == Permission::User && lp.map(|lp| lp == &claims.local_peer).unwrap_or(true) {
+        Ok(())
+    } else {
+        Err(Response {
+            error: Some("用户权限异常，请重新登录".to_string()),
+            data: None,
+        })
     }
 }
