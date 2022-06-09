@@ -1,13 +1,17 @@
 #[macro_use]
 extern crate tracing;
 #[macro_use]
-extern crate serde;
-#[macro_use]
 extern crate serde_with;
+#[macro_use]
+extern crate async_trait;
 
+use crate::database::DbPool;
+
+mod database;
 mod server;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -15,5 +19,11 @@ fn main() {
         )
         .init();
 
-    server::start(&"0.0.0.0:21114".parse().unwrap()).unwrap();
+    let pool = DbPool::new("sqlite://./db_v2.sqlite3")
+        .await
+        .expect("数据库连接失败");
+
+    server::start(&"0.0.0.0:21114".parse().unwrap(), pool)
+        .await
+        .unwrap();
 }

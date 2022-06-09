@@ -22,7 +22,7 @@ rust-ini = "0.18"
 #whoami = "1.2"
 base64 = "0.13"
 #axum = { version = "0.5", features = ["headers"] }
-sqlx = { git = "https://github.com/open-trade/sqlx", features = [ "runtime-tokio-rustls", "sqlite", "macros", "chrono", "json" ] }
+sqlx = { version = "0.5", features = [ "runtime-tokio-rustls", "sqlite", "macros", "chrono", "json" ] }
 deadpool = "0.8"
 async-trait = "0.1"
 async-speed-limit = { git = "https://github.com/open-trade/async-speed-limit" }
