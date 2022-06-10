@@ -1,14 +1,14 @@
-use crate::database::Permission;
+use crate::database::model::Permission;
 use crate::server::user::LocalPeer;
 use crate::server::Response;
 use axum::extract::{FromRequest, RequestParts};
 use axum::http::StatusCode;
-use axum::Json;
 use jsonwebtoken::{Algorithm, Validation};
 
 const SECRET: &[u8] = b"rustdesk api server";
 const ALGORITHM: Algorithm = Algorithm::HS512;
 
+#[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     pub exp: usize,
@@ -16,12 +16,23 @@ pub struct Claims {
     #[serde(rename = "iss")]
     pub username: String,
     pub nbf: usize,
-    pub local_peer: LocalPeer,
+    #[serde(default)]
+    pub local_peer: Option<LocalPeer>,
     pub perm: Permission,
 }
 
 impl Claims {
+    #[inline]
     pub fn gen_user_token(username: String, local_peer: LocalPeer) -> String {
+        Self::gen_token(username, Permission::User, Some(local_peer))
+    }
+
+    #[inline]
+    pub fn gen_manage_token(username: String, perm: Permission) -> String {
+        Self::gen_token(username, perm, None)
+    }
+
+    pub fn gen_token(username: String, perm: Permission, local_peer: Option<LocalPeer>) -> String {
         let current = chrono::Utc::now();
         let claims = Self {
             exp: (current + chrono::Duration::days(30)).timestamp() as usize,
@@ -29,7 +40,7 @@ impl Claims {
             username,
             nbf: current.timestamp() as usize,
             local_peer,
-            perm: Permission::User,
+            perm,
         };
 
         let header = jsonwebtoken::Header::new(ALGORITHM);
@@ -40,7 +51,7 @@ impl Claims {
 
 #[async_trait]
 impl<B: Send> FromRequest<B> for Claims {
-    type Rejection = (StatusCode, Json<Response<()>>);
+    type Rejection = (StatusCode, Response<()>);
 
     async fn from_request(req: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
         const ERROR_CODE: StatusCode = StatusCode::UNAUTHORIZED;
@@ -50,12 +61,7 @@ impl<B: Send> FromRequest<B> for Claims {
             .headers()
             .get(axum::http::header::AUTHORIZATION)
             .and_then(|v| v.to_str().ok())
-            .ok_or_else(|| {
-                (
-                    ERROR_CODE,
-                    Json(Response::error("输入token无效，请重新登录")),
-                )
-            })?;
+            .ok_or_else(|| (ERROR_CODE, Response::error("输入token无效，请重新登录")))?;
 
         let mut iter = header.split_whitespace();
         iter.next()
@@ -73,11 +79,6 @@ impl<B: Send> FromRequest<B> for Claims {
                 jsonwebtoken::decode(token, &key, &validation).ok()
             })
             .map(|d| d.claims)
-            .ok_or_else(|| {
-                (
-                    ERROR_CODE,
-                    Json(Response::error("token格式错误，请重新登录")),
-                )
-            })
+            .ok_or_else(|| (ERROR_CODE, Response::error("token格式错误，请重新登录")))
     }
 }

@@ -1,4 +1,4 @@
-use crate::database::AddressBook;
+use crate::database::model::AddressBook;
 use crate::server::jwt::Claims;
 use crate::server::{user, Response};
 use crate::DbPool;
@@ -10,21 +10,20 @@ pub async fn get_address_book(
     _data: Json<serde_json::Value>,
     claims: Claims,
     pool: Extension<DbPool>,
-) -> Json<Response<AddressBookData>> {
+) -> Response<AddressBookData> {
     debug!("get address book");
     if let Err(e) = user::check_perm(&claims, None) {
-        return Json(e);
+        return e;
     }
 
-    let (error, data) = match pool.get_address_book(&claims.username).await {
-        Ok(data) => (None, Some(AddressBookData { data })),
-        Err(sqlx::Error::RowNotFound) => (Some("未找到地址簿信息，请联系管理员".to_string()), None),
+    match pool.get_address_book(&claims.username).await {
+        Ok(data) => Response::ok(AddressBookData { data }),
+        Err(sqlx::Error::RowNotFound) => Response::error("未找到地址簿信息，请联系管理员"),
         Err(e) => {
             warn!(error = %e, "获取地址簿时出现异常");
-            (Some("获取地址簿失败，请联系管理员".to_string()), None)
+            Response::error("获取地址簿失败，请联系管理员")
         }
-    };
-    Json(Response { error, data })
+    }
 }
 
 #[instrument(skip(pool))]
@@ -32,24 +31,22 @@ pub async fn update_address_book(
     Json(AddressBookData { data }): Json<AddressBookData>,
     claims: Claims,
     pool: Extension<DbPool>,
-) -> Json<Response<()>> {
+) -> Response<()> {
     debug!("update address book");
     if let Err(e) = user::check_perm(&claims, None) {
-        return Json(e);
+        return e;
     }
 
-    let error = match pool
+    match pool
         .update_address_book(&claims.username, &data.tags, &data.peers)
         .await
     {
-        Ok(()) => None,
+        Ok(()) => Response::ok(()),
         Err(e) => {
             warn!(error = %e, "更新地址簿失败");
-            Some("更新失败，请重试".to_string())
+            Response::error("更新失败，请重试")
         }
-    };
-
-    Json(Response { error, data: None })
+    }
 }
 
 #[serde_as]
