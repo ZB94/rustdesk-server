@@ -44,4 +44,4 @@ flexi_logger = { version = "0.22", features = ["async", "use_chrono_for_offset"]
 hbb_common = { path = "libs/hbb_common" }
 
 [workspace]
-members = ["libs/hbb_common", "api_server"]
+members = ["libs/hbb_common", "api_server/*"]
