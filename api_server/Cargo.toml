@@ -15,7 +15,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3.9", features = ["env-filter"] }
 base64 = "0.13.0"
 uuid = "1"
-sqlx = { version = "0.5", features = ["sqlite", "runtime-tokio-rustls", "uuid", "chrono"] }
-chrono = "0.4.19"
+sqlx = { version = "0.5", features = ["sqlite", "runtime-tokio-rustls", "uuid", "chrono", "json"] }
+chrono = { version = "0.4.19", features = ["serde"] }
 jsonwebtoken = "8"
 async-trait = "0.1.52"

@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 mod jwt;
 
-use crate::database::{DbPool, Permission};
+use crate::database::{AddressBook, DbPool, Permission};
 use crate::server::jwt::Claims;
 
 pub async fn start(bind: &SocketAddr, pool: DbPool) -> Result<(), axum::BoxError> {
@@ -27,36 +27,51 @@ pub async fn start(bind: &SocketAddr, pool: DbPool) -> Result<(), axum::BoxError
     Ok(())
 }
 
-#[instrument]
-async fn get_ab(claims: Claims) -> Json<Response<GetAddressBook>> {
+#[instrument(skip(pool))]
+async fn get_ab(
+    _data: Json<serde_json::Value>,
+    claims: Claims,
+    pool: Extension<DbPool>,
+) -> Json<Response<AddressBookData>> {
     debug!("get address book");
-    check_perm(&claims, None)
-        .map(|_| {
-            Json(Response {
-                error: None,
-                data: Some(GetAddressBook {
-                    updated_at: 0,
-                    data: Default::default(),
-                }),
-            })
-        })
-        .unwrap_or_else(Json)
+    if let Err(e) = check_perm(&claims, None) {
+        return Json(e);
+    }
+
+    let (error, data) = match pool.get_address_book(&claims.username).await {
+        Ok(data) => (None, Some(AddressBookData { data })),
+        Err(sqlx::Error::RowNotFound) => (Some("未找到地址簿信息，请联系管理员".to_string()), None),
+        Err(e) => {
+            warn!(error = %e, "获取地址簿时出现异常");
+            (Some("获取地址簿失败，请联系管理员".to_string()), None)
+        }
+    };
+    Json(Response { error, data })
 }
 
-#[instrument]
+#[instrument(skip(pool))]
 async fn update_ab(
-    Json(UpdateAddressBook { data: _data }): Json<UpdateAddressBook>,
+    Json(AddressBookData { data }): Json<AddressBookData>,
     claims: Claims,
+    pool: Extension<DbPool>,
 ) -> Json<Response<()>> {
     debug!("update address book");
-    check_perm(&claims, None)
-        .map(|_| {
-            Json(Response {
-                error: None,
-                data: Some(()),
-            })
-        })
-        .unwrap_or_else(Json)
+    if let Err(e) = check_perm(&claims, None) {
+        return Json(e);
+    }
+
+    let error = match pool
+        .update_address_book(&claims.username, &data.tags, &data.peers)
+        .await
+    {
+        Ok(()) => None,
+        Err(e) => {
+            warn!(error = %e, "更新地址簿失败");
+            Some("更新失败，请重试".to_string())
+        }
+    };
+
+    Json(Response { error, data: None })
 }
 
 #[instrument(skip(pool))]
@@ -105,7 +120,9 @@ async fn current_user(
                 StatusCode::OK,
                 Json(Response {
                     error: None,
-                    data: Some(User { name: claims.iss }),
+                    data: Some(User {
+                        name: claims.username,
+                    }),
                 }),
             )
         })
@@ -154,40 +171,9 @@ pub struct Response<T> {
     pub data: Option<T>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
-pub struct AddressBook {
-    #[serde(default)]
-    pub tags: Vec<String>,
-    #[serde(default)]
-    pub peers: Vec<Peer>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Peer {
-    pub id: String,
-    #[serde(default)]
-    pub username: Option<String>,
-    #[serde(default)]
-    pub hostname: Option<String>,
-    #[serde(default)]
-    pub platform: Option<String>,
-    #[serde(default)]
-    pub alias: Option<String>,
-    #[serde(default)]
-    pub tags: Vec<String>,
-}
-
 #[serde_as]
-#[derive(Debug, Deserialize)]
-pub struct UpdateAddressBook {
-    #[serde_as(as = "JsonString")]
-    pub data: AddressBook,
-}
-
-#[serde_as]
-#[derive(Debug, Serialize)]
-pub struct GetAddressBook {
-    pub updated_at: i64,
+#[derive(Debug, Deserialize, Serialize)]
+pub struct AddressBookData {
     #[serde_as(as = "JsonString")]
     pub data: AddressBook,
 }

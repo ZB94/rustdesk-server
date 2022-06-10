@@ -12,7 +12,8 @@ const ALGORITHM: Algorithm = Algorithm::HS512;
 pub struct Claims {
     pub exp: usize,
     pub iat: usize,
-    pub iss: String,
+    #[serde(rename = "iss")]
+    pub username: String,
     pub nbf: usize,
     pub local_peer: LocalPeer,
     pub perm: Permission,
@@ -24,7 +25,7 @@ impl Claims {
         let claims = Self {
             exp: (current + chrono::Duration::days(30)).timestamp() as usize,
             iat: current.timestamp() as usize,
-            iss: username,
+            username,
             nbf: current.timestamp() as usize,
             local_peer,
             perm: Permission::User,
