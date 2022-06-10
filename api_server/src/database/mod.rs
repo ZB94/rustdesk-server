@@ -43,8 +43,12 @@ create table if not exists address_book
         .execute(&self.pool)
         .await?;
 
-        let _ = self.create_user("admin", "admin", Permission::Admin).await;
-        let _ = self.create_user("admin", "admin", Permission::User).await;
+        let _ = self
+            .create_user("admin", "admin", Permission::Admin, false)
+            .await;
+        let _ = self
+            .create_user("admin", "admin", Permission::User, false)
+            .await;
 
         Ok(())
     }
@@ -71,11 +75,13 @@ impl DbPool {
         username: &str,
         password: &str,
         perm: Permission,
+        disabled: bool,
     ) -> Result<()> {
-        sqlx::query("insert into user values (?, ?, ?, false);")
+        sqlx::query("insert into user values (?, ?, ?, ?);")
             .bind(username)
             .bind(password)
             .bind(perm)
+            .bind(disabled)
             .execute(&self.pool)
             .await?;
 

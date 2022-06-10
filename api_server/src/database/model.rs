@@ -9,7 +9,7 @@ pub enum Permission {
     User,
 }
 
-#[derive(FromRow)]
+#[derive(Debug, FromRow, Deserialize)]
 pub struct User {
     pub username: String,
     pub password: String,

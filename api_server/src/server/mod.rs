@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 
 use axum::response::IntoResponse;
-use axum::routing::post;
+use axum::routing::{delete, get, post};
 use axum::Extension;
 use serde::Serialize;
 
@@ -21,6 +21,9 @@ pub async fn start(bind: &SocketAddr, pool: DbPool) -> Result<(), axum::BoxError
         .route("/api/ab/get", post(address_book::get_address_book))
         .route("/manage/login", post(manage::login))
         .route("/manage/change_password", post(manage::change_password))
+        .route("/manage/user", get(manage::get_users))
+        .route("/manage/user", post(manage::crate_user))
+        .route("/manage/user", delete(manage::delete_user))
         .layer(Extension(pool));
 
     axum::Server::bind(bind)
