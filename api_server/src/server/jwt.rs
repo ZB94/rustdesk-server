@@ -1,5 +1,6 @@
 use crate::database::Permission;
-use crate::server::{LocalPeer, Response};
+use crate::server::user::LocalPeer;
+use crate::server::Response;
 use axum::extract::{FromRequest, RequestParts};
 use axum::http::StatusCode;
 use axum::Json;
@@ -52,10 +53,7 @@ impl<B: Send> FromRequest<B> for Claims {
             .ok_or_else(|| {
                 (
                     ERROR_CODE,
-                    Json(Response {
-                        error: Some("输入token无效，请重新登录".to_string()),
-                        data: None,
-                    }),
+                    Json(Response::error("输入token无效，请重新登录")),
                 )
             })?;
 
@@ -78,10 +76,7 @@ impl<B: Send> FromRequest<B> for Claims {
             .ok_or_else(|| {
                 (
                     ERROR_CODE,
-                    Json(Response {
-                        error: Some("token格式错误，请重新登录".to_string()),
-                        data: None,
-                    }),
+                    Json(Response::error("token格式错误，请重新登录")),
                 )
             })
     }
