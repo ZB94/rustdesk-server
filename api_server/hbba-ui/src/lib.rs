@@ -1,10 +1,18 @@
+#[macro_use]
+extern crate serde;
+#[macro_use]
+extern crate serde_json;
+
 mod utils;
 
+use crate::user::User;
 use eframe::egui::{CentralPanel, Context, FontData, FontDefinitions, Ui};
 use eframe::{App, CreationContext, Frame};
 use once_cell::sync::Lazy;
 use std::sync::RwLock;
 use wasm_bindgen::prelude::*;
+
+mod user;
 
 #[wasm_bindgen]
 pub fn start() {
@@ -18,33 +26,27 @@ pub fn start() {
 
 pub struct Application {
     load_font: bool,
+    user: User,
 }
 
-static FONT_DATA: Lazy<RwLock<Option<FontData>>> = Lazy::new(|| {
-    fn fetch_font() {
-        let req = ehttp::Request::get("res/SourceHanSerifCN-Medium.otf");
-        ehttp::fetch(req, |resp| {
-            if let Ok(resp) = resp {
-                if resp.status == 200 {
-                    let mut font = FontData::from_owned(resp.bytes);
-                    if let Ok(mut fd) = FONT_DATA.write() {
-                        font.tweak.scale = 1.2;
-                        *fd = Some(font);
-                        return;
-                    }
-                }
-            }
-            fetch_font();
+impl App for Application {
+    fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
+        if !self.load_font(ctx) {
+            return;
+        }
+
+        CentralPanel::default().show(ctx, |ui| {
+            self.user.ui(ui);
         });
     }
-
-    fetch_font();
-    RwLock::default()
-});
+}
 
 impl Application {
     pub fn new(_ctx: &CreationContext) -> Self {
-        Self { load_font: false }
+        Self {
+            load_font: false,
+            user: User::new(),
+        }
     }
 
     fn load_font(&mut self, ctx: &Context) -> bool {
@@ -69,14 +71,35 @@ impl Application {
     }
 }
 
-impl App for Application {
-    fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
-        if !self.load_font(ctx) {
-            return;
-        }
-
-        CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Hello World! 你好，世界！");
-        });
+static FONT_DATA: Lazy<RwLock<Option<FontData>>> = Lazy::new(|| {
+    use reqwasm::http::Request;
+    fn fetch_font() {
+        wasm_bindgen_futures::spawn_local(async {
+            let resp = Request::get("res/SourceHanSerifCN-Medium.otf")
+                .send()
+                .await
+                .ok()
+                .and_then(|resp| {
+                    if resp.status() == 200 {
+                        Some(resp)
+                    } else {
+                        None
+                    }
+                });
+            if let Some(resp) = resp {
+                if let Ok(data) = resp.binary().await {
+                    let mut font = FontData::from_owned(data);
+                    if let Ok(mut fd) = FONT_DATA.write() {
+                        font.tweak.scale = 1.4;
+                        *fd = Some(font);
+                        return;
+                    }
+                }
+            }
+            fetch_font();
+        })
     }
-}
+
+    fetch_font();
+    RwLock::default()
+});

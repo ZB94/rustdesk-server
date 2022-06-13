@@ -12,8 +12,23 @@ pub mod user;
 
 use crate::database::DbPool;
 
-pub async fn start(bind: &SocketAddr, pool: DbPool) -> Result<(), axum::BoxError> {
-    let router = axum::Router::new()
+pub async fn start(
+    bind: &SocketAddr,
+    pool: DbPool,
+    static_dir: Option<String>,
+) -> Result<(), axum::BoxError> {
+    let mut router = axum::Router::new();
+
+    if let Some(d) = static_dir {
+        debug!("static dir: {}", &d);
+        let static_dir = axum_extra::routing::SpaRouter::new("/static", d);
+        router = router.merge(static_dir).route(
+            "/",
+            get(|| async { axum::response::Redirect::permanent("/static/") }),
+        );
+    }
+
+    router = router
         .route("/api/login", post(user::login))
         .route("/api/logout", post(user::logout))
         .route("/api/currentUser", post(user::current_user))
