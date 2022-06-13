@@ -156,7 +156,7 @@ impl User {
             .unwrap_or_default()
         {
             self.refer_user = None;
-            self.get_user_info(false);
+            self.get_user_info(false, true);
         }
 
         Window::new("用户管理")
@@ -164,7 +164,7 @@ impl User {
             .show(ui.ctx(), |ui| {
                 ui.group(|ui| {
                     if ui.button("刷新列表").clicked() {
-                        self.get_user_info(false);
+                        self.get_user_info(false, false);
                     }
                     ScrollArea::new([false, true])
                         .max_height(300.0)
@@ -180,32 +180,40 @@ impl User {
                                     ui.end_row();
 
                                     let mut remove_list = vec![];
+                                    let mut update_list = vec![];
                                     for user in &mut self.users {
                                         let UserInfo {
                                             username,
                                             perm,
                                             disabled,
                                         } = user;
+
                                         ui.label(username.as_str());
                                         ui.label(perm.name());
-                                        ui.checkbox(disabled, "");
+                                        if ui.checkbox(disabled, "").clicked() {
+                                            update_list.push(json!({
+                                                "username": username.clone(),
+                                                "perm": *perm,
+                                                "disabled": *disabled
+                                            }));
+                                        }
 
                                         if ui.button("删除").clicked() {
-                                            remove_list.push((username.clone(), *perm));
+                                            remove_list.push(json!({
+                                                "username": username.clone(),
+                                                "perm": perm
+                                            }));
                                         }
                                         ui.end_row();
                                     }
 
-                                    for (username, perm) in remove_list {
-                                        self.req(
-                                            Operation::DeleteUser,
-                                            Some(json!({
-                                                "username": username,
-                                                "perm": perm
-                                            })),
-                                            false,
-                                        );
-                                        self.get_user_info(true);
+                                    for data in remove_list {
+                                        self.req(Operation::DeleteUser, Some(data), false);
+                                        self.get_user_info(true, true);
+                                    }
+
+                                    for data in update_list {
+                                        self.req(Operation::SetDisabled, Some(data), false);
                                     }
                                 });
                         });
@@ -252,7 +260,7 @@ impl User {
                                     })),
                                     false,
                                 );
-                                self.get_user_info(true);
+                                self.get_user_info(true, true);
                             }
                         });
                         ui.end_row();
@@ -265,11 +273,11 @@ impl User {
     ///
     /// `wait`为`true`时等待一段时间后再请求
     #[inline]
-    fn get_user_info(&mut self, wait: bool) {
+    fn get_user_info(&mut self, wait: bool, ignore_ok: bool) {
         if wait {
             self.refer_user = Some(Instant::now());
         } else {
-            self.req::<()>(Operation::GetUserList, None, false);
+            self.req::<()>(Operation::GetUserList, None, ignore_ok);
         }
     }
 
@@ -347,10 +355,15 @@ impl User {
                     }
                     self.access_token = Some(access_token);
                     if self.perm == Permission::Admin {
-                        self.get_user_info(true);
+                        self.get_user_info(true, true);
                     }
                 }
-                (_, Some(ResponseBody::Users { users })) => self.users = users,
+                (ignore, Some(ResponseBody::Users { users })) => {
+                    self.users = users;
+                    if !ignore {
+                        self.add_info(Operation::GetUserList, "操作成功");
+                    }
+                }
                 (false, Some(ResponseBody::Empty {})) => {
                     self.add_info(resp.op, "操作成功");
                 }
@@ -479,6 +492,7 @@ pub enum Operation {
     GetUserList,
     CreateUser,
     DeleteUser,
+    SetDisabled,
 }
 
 impl Operation {
@@ -490,6 +504,7 @@ impl Operation {
             Operation::GetUserList => "获取用户列表",
             Operation::CreateUser => "创建用户",
             Operation::DeleteUser => "删除用户",
+            Operation::SetDisabled => "更新用户禁用状态",
         }
     }
 
@@ -503,6 +518,7 @@ impl Operation {
             Operation::GetUserList => (Method::GET, "/manage/user"),
             Operation::CreateUser => (Method::POST, "/manage/user"),
             Operation::DeleteUser => (Method::DELETE, "/manage/user"),
+            Operation::SetDisabled => (Method::PUT, "/manage/user"),
         }
     }
 }

@@ -142,6 +142,21 @@ impl DbPool {
             .fetch_all(&self.pool)
             .await
     }
+
+    pub async fn set_user_disabled(
+        &self,
+        username: &str,
+        perm: Permission,
+        disabled: bool,
+    ) -> Result<()> {
+        sqlx::query("update user set disabled = ? where username = ? and perm = ?")
+            .bind(disabled)
+            .bind(username)
+            .bind(perm)
+            .execute(&self.pool)
+            .await
+            .map(|_| ())
+    }
 }
 
 /// 地址簿操作

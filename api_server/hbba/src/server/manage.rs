@@ -128,6 +128,38 @@ pub async fn delete_user(
     }
 }
 
+#[instrument(skip(pool))]
+pub async fn update_user(
+    Json(user): Json<UpdateUser>,
+    claims: Claims,
+    pool: Extension<DbPool>,
+) -> (StatusCode, Response<()>) {
+    if let Err(e) = check_admin(&claims) {
+        return e;
+    }
+
+    match pool
+        .set_user_disabled(&user.username, user.perm, user.disabled)
+        .await
+    {
+        Ok(_) => (StatusCode::OK, Response::ok(())),
+        Err(e) => {
+            warn!(error = %e, "设置用户禁用状态时出现异常");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Response::error("设置用户禁用状态时出现错误，请重试或联系管理员"),
+            )
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateUser {
+    pub username: String,
+    pub perm: Permission,
+    pub disabled: bool,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct DeleteUser {
     pub username: String,

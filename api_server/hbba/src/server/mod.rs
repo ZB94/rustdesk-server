@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 
 use axum::response::IntoResponse;
-use axum::routing::{delete, get, post};
+use axum::routing::{delete, get, post, put};
 use axum::Extension;
 use serde::Serialize;
 
@@ -39,6 +39,7 @@ pub async fn start(
         .route("/manage/user", get(manage::get_users))
         .route("/manage/user", post(manage::crate_user))
         .route("/manage/user", delete(manage::delete_user))
+        .route("/manage/user", put(manage::update_user))
         .layer(Extension(pool));
 
     axum::Server::bind(bind)
