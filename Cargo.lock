@@ -1317,6 +1317,7 @@ dependencies = [
  "console_error_panic_hook",
  "crossbeam-channel",
  "eframe",
+ "instant",
  "once_cell",
  "reqwasm",
  "serde",

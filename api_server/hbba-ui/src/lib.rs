@@ -35,6 +35,7 @@ impl App for Application {
             return;
         }
 
+        ctx.request_repaint();
         CentralPanel::default().show(ctx, |ui| {
             self.user.ui(ui);
         });
