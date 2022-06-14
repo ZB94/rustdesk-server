@@ -15,10 +15,16 @@ pub async fn login(Json(login): Json<Login>, pool: Extension<DbPool>) -> Respons
         .query_user(&login.username, &login.password, login.perm)
         .await
     {
-        Ok(user) => Response::ok(LoginResponse {
-            access_token: Claims::gen_manage_token(user.username, user.perm),
-            perm: user.perm,
-        }),
+        Ok(user) => {
+            if user.disabled {
+                Response::error("该用户已被禁用，请联系管理员")
+            } else {
+                Response::ok(LoginResponse {
+                    access_token: Claims::gen_manage_token(user.username, user.perm),
+                    perm: user.perm,
+                })
+            }
+        }
         Err(Error::RowNotFound) => Response::error("用户名或密码错误"),
         Err(e) => {
             warn!(error = %e, "登录时发生异常");
