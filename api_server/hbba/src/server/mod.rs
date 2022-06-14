@@ -7,6 +7,7 @@ use axum::response::IntoResponse;
 use axum::routing::{delete, get, get_service, post, put};
 use axum::Extension;
 use serde::Serialize;
+use tokio::sync::RwLock;
 
 use crate::database::DbPool;
 
@@ -22,15 +23,7 @@ pub async fn start(
     download_dir: Option<String>,
     server_address: ServerAddress,
 ) -> Result<(), axum::BoxError> {
-    let mut router = axum::Router::new()
-        .route(
-            "/server_address",
-            get(|sa: Extension<Arc<ServerAddress>>| async move {
-                let sa: ServerAddress = (&*sa.0).clone();
-                Response::ok(sa)
-            }),
-        )
-        .layer(Extension(Arc::new(server_address)));
+    let mut router = axum::Router::new();
 
     if let Some(d) = static_dir {
         debug!("static dir: {}", &d);
@@ -98,6 +91,9 @@ pub async fn start(
         .route("/manage/user", post(manage::crate_user))
         .route("/manage/user", delete(manage::delete_user))
         .route("/manage/user", put(manage::update_user))
+        .route("/manage/server_address", get(manage::get_server_address))
+        .route("/manage/server_address", put(manage::update_server_address))
+        .layer(Extension(Arc::new(RwLock::new(server_address))))
         .layer(Extension(pool));
 
     axum::Server::bind(bind)
@@ -113,36 +109,48 @@ pub struct DownloadInfo {
     pub url: String,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ServerAddress {
-    pub id_server: SocketAddr,
-    pub reply_server: SocketAddr,
-    pub api_server: SocketAddr,
+    pub id_server: String,
+    pub reply_server: String,
+    pub api_server: String,
     pub pubkey: String,
 }
 
 impl ServerAddress {
-    pub fn new(
-        id_server: SocketAddr,
-        reply_server: Option<SocketAddr>,
-        api_server: Option<SocketAddr>,
-        pubkey: Option<String>,
-    ) -> Self {
-        let ip = id_server.ip();
-        let reply_server = reply_server.unwrap_or_else(|| SocketAddr::new(ip, 21117));
-        let api_server = api_server.unwrap_or_else(|| SocketAddr::new(ip, 21114));
-        let pubkey = pubkey.unwrap_or_else(|| {
-            std::fs::read_to_string("id_ed25519.pub")
-                .expect("读取公钥文件失败")
-                .trim()
-                .to_string()
-        });
-        Self {
-            id_server,
-            reply_server,
-            api_server,
-            pubkey,
-        }
+    // pub fn new(
+    //     id_server: SocketAddr,
+    //     reply_server: Option<SocketAddr>,
+    //     api_server: Option<SocketAddr>,
+    //     pubkey: Option<String>,
+    // ) -> Self {
+    //     let ip = id_server.ip();
+    //     let reply_server = reply_server.unwrap_or_else(|| SocketAddr::new(ip, 21117));
+    //     let api_server = api_server.unwrap_or_else(|| SocketAddr::new(ip, 21114));
+    //     let pubkey = pubkey.unwrap_or_else(|| {
+    //         std::fs::read_to_string("id_ed25519.pub")
+    //             .expect("读取公钥文件失败")
+    //             .trim()
+    //             .to_string()
+    //     });
+    //     Self {
+    //         id_server,
+    //         reply_server,
+    //         api_server,
+    //         pubkey,
+    //     }
+    // }
+
+    const SAVE_FILE: &'static str = "server_address.json";
+    pub async fn save(&self) -> std::io::Result<()> {
+        let data = serde_json::to_vec(self).unwrap();
+        tokio::fs::write(Self::SAVE_FILE, data).await
+    }
+
+    pub async fn load() -> std::io::Result<Self> {
+        let data = tokio::fs::read(Self::SAVE_FILE).await?;
+        serde_json::from_slice(&data)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
     }
 }
 

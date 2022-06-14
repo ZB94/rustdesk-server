@@ -1,25 +1,9 @@
-use eframe::egui::{Response, TextEdit, Widget};
+use eframe::egui::{Response, Widget};
 use once_cell::sync::Lazy;
 use std::sync::RwLock;
 
 use crate::Ui;
 use reqwasm::http::Method;
-
-static SERVER_ADDRESS: Lazy<RwLock<Option<Server>>> = Lazy::new(|| {
-    crate::utils::request::<(), _, _>(
-        Method::GET,
-        "/server_address",
-        None,
-        None,
-        |r: Result<(_, Server), _>| {
-            if let Ok((_, server)) = r {
-                *SERVER_ADDRESS.write().unwrap() = Some(server);
-            }
-        },
-    );
-
-    Default::default()
-});
 
 static DOWNLOAD_LIST: Lazy<RwLock<Vec<Link>>> = Lazy::new(|| {
     #[derive(Debug, Deserialize)]
@@ -80,22 +64,7 @@ impl Widget for Help {
                 ui.label("4. 点击确认按钮完成设置");
 
                 ui.label("");
-                if let Some(server) = &*SERVER_ADDRESS.read().unwrap() {
-                    for (label, mut value) in [
-                        ("ID服务器：", server.id_server.as_str()),
-                        ("中继服务器：", server.reply_server.as_str()),
-                        ("API服务器：", server.api_server.as_str()),
-                        ("KEY：", server.pubkey.as_str()),
-                    ]
-                    {
-                        ui.horizontal(|ui| {
-                            ui.label(label);
-                            ui.add(TextEdit::singleline(&mut value).desired_width(f32::INFINITY));
-                        });
-                    }
-                } else {
-                    ui.label("未能获取到服务器设置，请刷新重试或联系管理员");
-                }
+                ui.label("当前服务配置请登录后查看");
             });
             ui.collapsing("3. 登录并同步地址簿（可选）", |ui| {
                 ui.label("如果正确设置了客户端的API服务器地址，可以在客户端中登入账号，在不同客户端间同步地址簿");
@@ -144,12 +113,4 @@ impl Widget for Help {
 pub struct Link {
     pub name: String,
     pub url: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Server {
-    pub id_server: String,
-    pub reply_server: String,
-    pub api_server: String,
-    pub pubkey: String,
 }

@@ -1,10 +1,12 @@
 use crate::database::model::Permission;
 use crate::server::jwt::Claims;
-use crate::server::Response;
+use crate::server::{Response, ServerAddress};
 use crate::DbPool;
 use axum::http::StatusCode;
 use axum::{Extension, Json};
 use sqlx::Error;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 #[instrument(skip(pool))]
 pub async fn login(Json(login): Json<Login>, pool: Extension<DbPool>) -> Response<LoginResponse> {
@@ -150,6 +152,39 @@ pub async fn update_user(
                 Response::error("设置用户禁用状态时出现错误，请重试或联系管理员"),
             )
         }
+    }
+}
+
+#[instrument]
+pub async fn get_server_address(
+    _claims: Claims,
+    server_address: Extension<Arc<RwLock<ServerAddress>>>,
+) -> Response<ServerAddress> {
+    debug!("get server address");
+    Response::ok(server_address.0.read().await.clone())
+}
+
+#[instrument]
+pub async fn update_server_address(
+    Json(sa): Json<ServerAddress>,
+    claims: Claims,
+    server_address: Extension<Arc<RwLock<ServerAddress>>>,
+) -> (StatusCode, Response<()>) {
+    debug!("update server address");
+    match check_admin(&claims) {
+        Ok(_) => {
+            if let Err(e) = sa.save().await {
+                warn!(error = %e, "更新服务器配置失败");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Response::error("更新服务器配置失败，请重试或联系管理员"),
+                )
+            } else {
+                *server_address.0.write().await = sa;
+                (StatusCode::OK, Response::ok(()))
+            }
+        }
+        Err(e) => e,
     }
 }
 

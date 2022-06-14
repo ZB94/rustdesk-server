@@ -24,6 +24,7 @@ pub struct User {
     refer_user: Option<Instant>,
     chanel: (Sender<(u16, Response)>, Receiver<(u16, Response)>),
     message: Vec<(Color32, String)>,
+    server_address: (Instant, Option<ServerAddress>),
 }
 
 impl User {
@@ -42,16 +43,28 @@ impl User {
             refer_user: None,
             chanel: unbounded(),
             message: Vec::with_capacity(5),
+            server_address: (Instant::now() - Duration::from_secs(1), None),
         }
     }
 
+    fn logout(&mut self) {
+        self.pwd_current.clear();
+        self.pwd_new1.clear();
+        self.pwd_new2.clear();
+        self.create_user = Default::default();
+        self.users.clear();
+        self.refer_user = None;
+        self.server_address = (Instant::now() - Duration::from_secs(1), None);
+        self.access_token = None;
+    }
+
     #[inline]
-    pub fn login(&self) -> bool {
+    pub fn is_login(&self) -> bool {
         self.access_token.is_some()
     }
 
     pub fn ui(&mut self, ui: &mut Ui) {
-        if self.login() {
+        if self.is_login() {
             self.ui_user(ui);
         } else {
             self.ui_login(ui);
@@ -61,9 +74,64 @@ impl User {
 
     fn ui_user(&mut self, ui: &mut Ui) {
         self.show_user_info(ui);
+        self.show_server_address(ui);
         if self.perm == Permission::Admin {
             self.show_user_manage(ui);
         }
+    }
+
+    fn show_server_address(&mut self, ui: &mut Ui) {
+        Window::new("当前服务配置")
+            .resizable(false)
+            .show(ui.ctx(), |ui| {
+                Grid::new("server address")
+                    .spacing([4.0, 8.0])
+                    .max_col_width(400.0)
+                    .show(ui, |ui| {
+                        if let Some(server) = &mut self.server_address.1 {
+                            let admin = self.perm == Permission::Admin;
+                            for (label, value) in [
+                                ("ID服务器：", &mut server.id_server),
+                                ("中继服务器：", &mut server.reply_server),
+                                ("API服务器：", &mut server.api_server),
+                                ("KEY：", &mut server.pubkey),
+                            ] {
+                                ui.label(label);
+                                if admin {
+                                    ui.add(TextEdit::singleline(value).desired_width(400.0));
+                                } else {
+                                    ui.add(
+                                        TextEdit::singleline(&mut value.as_str())
+                                            .desired_width(400.0),
+                                    );
+                                }
+                                ui.end_row();
+                            }
+                            if admin {
+                                ui.label("");
+                                let change = ui
+                                    .with_layout(Layout::right_to_left(), |ui| {
+                                        ui.button("修改").clicked()
+                                    })
+                                    .inner;
+                                if change {
+                                    let sa = server.clone();
+                                    self.req(Operation::ChangeServerAddress, Some(sa), false)
+                                }
+                                ui.end_row();
+                            }
+                        } else {
+                            ui.spinner();
+                            if self.is_login()
+                                && self.server_address.0.elapsed() >= Duration::from_secs(1)
+                            {
+                                self.req(Operation::GetServerAddress, Option::<()>::None, true);
+                                self.server_address.0 = Instant::now();
+                            }
+                            ui.end_row();
+                        }
+                    });
+            });
     }
 
     fn show_user_info(&mut self, ui: &mut Ui) {
@@ -109,7 +177,7 @@ impl User {
                             .button(RichText::new("退出").color(Color32::RED))
                             .clicked()
                         {
-                            self.access_token = None;
+                            self.logout();
                         }
                         if ui.button("修改密码").clicked() {
                             if self.pwd_current.is_empty()
@@ -364,6 +432,12 @@ impl User {
                         self.add_info(Operation::GetUserList, "操作成功");
                     }
                 }
+                (ignore, Some(ResponseBody::ServerAddress(server))) => {
+                    self.server_address.1 = Some(server);
+                    if !ignore {
+                        self.add_info(Operation::GetServerAddress, "操作成功");
+                    }
+                }
                 (false, Some(ResponseBody::Empty {})) => {
                     self.add_info(resp.op, "操作成功");
                 }
@@ -447,6 +521,12 @@ impl Permission {
     }
 }
 
+impl Default for Permission {
+    fn default() -> Self {
+        Self::User
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Response {
     #[serde(skip, default)]
@@ -474,6 +554,7 @@ impl Response {
 pub enum ResponseBody {
     Login { access_token: String },
     Users { users: Vec<UserInfo> },
+    ServerAddress(ServerAddress),
     Empty {},
 }
 
@@ -493,6 +574,8 @@ pub enum Operation {
     CreateUser,
     DeleteUser,
     SetDisabled,
+    GetServerAddress,
+    ChangeServerAddress,
 }
 
 impl Operation {
@@ -505,6 +588,8 @@ impl Operation {
             Operation::CreateUser => "创建用户",
             Operation::DeleteUser => "删除用户",
             Operation::SetDisabled => "更新用户禁用状态",
+            Operation::GetServerAddress => "获取服务器配置",
+            Operation::ChangeServerAddress => "修改服务器配置",
         }
     }
 
@@ -519,6 +604,8 @@ impl Operation {
             Operation::CreateUser => (Method::POST, "/manage/user"),
             Operation::DeleteUser => (Method::DELETE, "/manage/user"),
             Operation::SetDisabled => (Method::PUT, "/manage/user"),
+            Operation::GetServerAddress => (Method::GET, "/manage/server_address"),
+            Operation::ChangeServerAddress => (Method::PUT, "/manage/server_address"),
         }
     }
 }
@@ -527,4 +614,12 @@ impl Default for Operation {
     fn default() -> Self {
         Self::Default
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ServerAddress {
+    pub id_server: String,
+    pub reply_server: String,
+    pub api_server: String,
+    pub pubkey: String,
 }
