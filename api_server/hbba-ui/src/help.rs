@@ -3,10 +3,9 @@ use once_cell::sync::Lazy;
 use std::sync::RwLock;
 
 use crate::Ui;
+use reqwasm::http::Method;
 
 static SERVER_ADDRESS: Lazy<RwLock<Option<Server>>> = Lazy::new(|| {
-    use reqwasm::http::Method;
-
     crate::utils::request::<(), _, _>(
         Method::GET,
         "/server_address",
@@ -22,17 +21,30 @@ static SERVER_ADDRESS: Lazy<RwLock<Option<Server>>> = Lazy::new(|| {
     Default::default()
 });
 
-pub struct Help {
-    downloads: Vec<Link>,
-}
-
-impl Help {
-    pub fn new() -> Self {
-        Self { downloads: vec![] }
+static DOWNLOAD_LIST: Lazy<RwLock<Vec<Link>>> = Lazy::new(|| {
+    #[derive(Debug, Deserialize)]
+    struct DownloadList {
+        pub links: Vec<Link>,
     }
-}
 
-impl Widget for &mut Help {
+    crate::utils::request::<(), _, _>(
+        Method::GET,
+        "/download_list",
+        None,
+        None,
+        |r: Result<(_, DownloadList), _>| {
+            if let Ok((_, dl)) = r {
+                *DOWNLOAD_LIST.write().unwrap() = dl.links;
+            }
+        },
+    );
+
+    Default::default()
+});
+
+pub struct Help;
+
+impl Widget for Help {
     fn ui(self, ui: &mut Ui) -> Response {
         ui.vertical(|ui| {
             ui.heading("客户端使用说明");
@@ -49,10 +61,12 @@ impl Widget for &mut Help {
 
                 ui.label("直接下载：");
                 ui.group(|ui| {
-                    if self.downloads.is_empty() {
+                    let dl = DOWNLOAD_LIST.read().unwrap();
+
+                    if dl.is_empty() {
                         ui.label("当前服务器未配置直接下载地址，请在官网下载地址下载客户端");
                     } else {
-                        for link in &self.downloads {
+                        for link in dl.iter() {
                             ui.hyperlink_to(&link.name, &link.url);
                         }
                     }

@@ -1,22 +1,25 @@
+use std::future::ready;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::{delete, get, post, put};
+use axum::routing::{delete, get, get_service, post, put};
 use axum::Extension;
 use serde::Serialize;
+
+use crate::database::DbPool;
 
 pub mod address_book;
 pub mod jwt;
 pub mod manage;
 pub mod user;
 
-use crate::database::DbPool;
-
 pub async fn start(
     bind: &SocketAddr,
     pool: DbPool,
     static_dir: Option<String>,
+    download_dir: Option<String>,
     server_address: ServerAddress,
 ) -> Result<(), axum::BoxError> {
     let mut router = axum::Router::new()
@@ -31,11 +34,56 @@ pub async fn start(
 
     if let Some(d) = static_dir {
         debug!("static dir: {}", &d);
-        let static_dir = axum_extra::routing::SpaRouter::new("/static", d);
-        router = router.merge(static_dir).route(
-            "/",
-            get(|| async { axum::response::Redirect::permanent("/static/") }),
-        );
+        let static_dir = tower_http::services::ServeDir::new(d);
+        router = router
+            .nest(
+                "/static",
+                get_service(static_dir).handle_error(|_| ready(StatusCode::INTERNAL_SERVER_ERROR)),
+            )
+            .route(
+                "/",
+                get(|| async { axum::response::Redirect::permanent("/static/") }),
+            );
+    }
+
+    if let Some(d) = download_dir {
+        debug!("download dir: {}", &d);
+        let downloads = std::fs::read_dir(&d)
+            .expect("遍历下载目录失败")
+            .filter_map(|f| {
+                let f = f.expect("获取下载目录文件信息失败");
+                let path = f.path();
+                if path.is_file() {
+                    let name = path
+                        .file_name()
+                        .expect("获取下载目录文件名称失败")
+                        .to_string_lossy()
+                        .to_string();
+                    Some(DownloadInfo {
+                        url: format!("/download/{name}"),
+                        name,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let download_dir = tower_http::services::ServeDir::new(d);
+        router = router
+            .nest(
+                "/download",
+                get_service(download_dir)
+                    .handle_error(|_| ready(StatusCode::INTERNAL_SERVER_ERROR)),
+            )
+            .route(
+                "/download_list",
+                get(|dl: Extension<Arc<Vec<DownloadInfo>>>| async move {
+                    let dl = (&*dl.0).clone();
+                    Response::ok(serde_json::json!({ "links": dl }))
+                }),
+            )
+            .layer(Extension(Arc::new(downloads)));
     }
 
     router = router
@@ -57,6 +105,12 @@ pub async fn start(
         .await?;
 
     Ok(())
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct DownloadInfo {
+    pub name: String,
+    pub url: String,
 }
 
 #[derive(Debug, Serialize, Clone)]

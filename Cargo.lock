@@ -182,24 +182,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "axum-extra"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f4a22e494aab08f7fb9e9b462e49e4c1637dd9a4bfa4250e9addfdbafc1a022"
-dependencies = [
- "axum",
- "bytes",
- "http",
- "mime",
- "pin-project-lite",
- "tokio",
- "tower",
- "tower-http",
- "tower-layer",
- "tower-service",
-]
-
-[[package]]
 name = "base64"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1295,7 +1277,6 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "axum",
- "axum-extra",
  "base64",
  "chrono",
  "clap 3.1.18",
@@ -1305,6 +1286,7 @@ dependencies = [
  "serde_with",
  "sqlx",
  "tokio",
+ "tower-http",
  "tracing",
  "tracing-subscriber",
  "uuid 1.1.1",

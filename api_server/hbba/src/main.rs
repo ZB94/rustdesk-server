@@ -34,9 +34,15 @@ async fn main() {
         args.pubkey,
     );
 
-    server::start(&args.bind, pool, args.static_dir, server_address)
-        .await
-        .unwrap();
+    server::start(
+        &args.bind,
+        pool,
+        args.static_dir,
+        args.download_dir,
+        server_address,
+    )
+    .await
+    .unwrap();
 }
 
 #[derive(Debug, Parser)]
@@ -59,5 +65,5 @@ pub struct Args {
     pub static_dir: Option<String>,
     /// 设置客户端下载目录。设置时将指定目录的所有文件都改在到`/download`下
     #[clap(long, short)]
-    pub client_dir: Option<String>,
+    pub download_dir: Option<String>,
 }

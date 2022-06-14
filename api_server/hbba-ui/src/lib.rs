@@ -5,7 +5,7 @@ extern crate serde_json;
 
 use std::sync::RwLock;
 
-use eframe::egui::{CentralPanel, Context, FontData, FontDefinitions, Ui};
+use eframe::egui::{CentralPanel, Context, FontData, FontDefinitions, ScrollArea, Ui};
 use eframe::{App, CreationContext, Frame};
 use once_cell::sync::Lazy;
 use wasm_bindgen::prelude::*;
@@ -31,7 +31,6 @@ pub fn start() {
 pub struct Application {
     load_font: bool,
     user: User,
-    help: Help,
 }
 
 impl App for Application {
@@ -42,9 +41,10 @@ impl App for Application {
 
         ctx.request_repaint();
         CentralPanel::default().show(ctx, |ui| {
-            ui.add(&mut self.help);
-
-            self.user.ui(ui);
+            ScrollArea::new([true, true]).show(ui, |ui| {
+                ui.add(Help);
+                self.user.ui(ui);
+            });
         });
     }
 }
@@ -54,7 +54,6 @@ impl Application {
         Self {
             load_font: false,
             user: User::new(),
-            help: Help::new(),
         }
     }
 
