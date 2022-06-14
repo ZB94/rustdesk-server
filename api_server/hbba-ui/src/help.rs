@@ -1,18 +1,34 @@
-use eframe::egui::{Response, Widget};
+use eframe::egui::{Response, TextEdit, Widget};
+use once_cell::sync::Lazy;
+use std::sync::RwLock;
 
 use crate::Ui;
 
+static SERVER_ADDRESS: Lazy<RwLock<Option<Server>>> = Lazy::new(|| {
+    use reqwasm::http::Method;
+
+    crate::utils::request::<(), _, _>(
+        Method::GET,
+        "/server_address",
+        None,
+        None,
+        |r: Result<(_, Server), _>| {
+            if let Ok((_, server)) = r {
+                *SERVER_ADDRESS.write().unwrap() = Some(server);
+            }
+        },
+    );
+
+    Default::default()
+});
+
 pub struct Help {
     downloads: Vec<Link>,
-    server: Option<Server>,
 }
 
 impl Help {
     pub fn new() -> Self {
-        Self {
-            downloads: vec![],
-            server: None,
-        }
+        Self { downloads: vec![] }
     }
 }
 
@@ -50,7 +66,7 @@ impl Widget for &mut Help {
                 ui.label("4. 点击确认按钮完成设置");
 
                 ui.label("");
-                if let Some(server) = &self.server {
+                if let Some(server) = &*SERVER_ADDRESS.read().unwrap() {
                     for (label, mut value) in [
                         ("ID服务器：", server.id_server.as_str()),
                         ("中继服务器：", server.reply_server.as_str()),
@@ -60,7 +76,7 @@ impl Widget for &mut Help {
                     {
                         ui.horizontal(|ui| {
                             ui.label(label);
-                            ui.text_edit_singleline(&mut value);
+                            ui.add(TextEdit::singleline(&mut value).desired_width(f32::INFINITY));
                         });
                     }
                 } else {

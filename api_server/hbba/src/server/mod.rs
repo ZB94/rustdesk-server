@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use axum::response::IntoResponse;
 use axum::routing::{delete, get, post, put};
@@ -16,8 +17,17 @@ pub async fn start(
     bind: &SocketAddr,
     pool: DbPool,
     static_dir: Option<String>,
+    server_address: ServerAddress,
 ) -> Result<(), axum::BoxError> {
-    let mut router = axum::Router::new();
+    let mut router = axum::Router::new()
+        .route(
+            "/server_address",
+            get(|sa: Extension<Arc<ServerAddress>>| async move {
+                let sa: ServerAddress = (&*sa.0).clone();
+                Response::ok(sa)
+            }),
+        )
+        .layer(Extension(Arc::new(server_address)));
 
     if let Some(d) = static_dir {
         debug!("static dir: {}", &d);
@@ -47,6 +57,39 @@ pub async fn start(
         .await?;
 
     Ok(())
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct ServerAddress {
+    pub id_server: SocketAddr,
+    pub reply_server: SocketAddr,
+    pub api_server: SocketAddr,
+    pub pubkey: String,
+}
+
+impl ServerAddress {
+    pub fn new(
+        id_server: SocketAddr,
+        reply_server: Option<SocketAddr>,
+        api_server: Option<SocketAddr>,
+        pubkey: Option<String>,
+    ) -> Self {
+        let ip = id_server.ip();
+        let reply_server = reply_server.unwrap_or_else(|| SocketAddr::new(ip, 21117));
+        let api_server = api_server.unwrap_or_else(|| SocketAddr::new(ip, 21114));
+        let pubkey = pubkey.unwrap_or_else(|| {
+            std::fs::read_to_string("id_ed25519.pub")
+                .expect("读取公钥文件失败")
+                .trim()
+                .to_string()
+        });
+        Self {
+            id_server,
+            reply_server,
+            api_server,
+            pubkey,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]

@@ -3,18 +3,20 @@ extern crate serde;
 #[macro_use]
 extern crate serde_json;
 
-mod help;
-mod utils;
+use std::sync::RwLock;
 
-use crate::help::Help;
-use crate::user::User;
 use eframe::egui::{CentralPanel, Context, FontData, FontDefinitions, Ui};
 use eframe::{App, CreationContext, Frame};
 use once_cell::sync::Lazy;
-use std::sync::RwLock;
 use wasm_bindgen::prelude::*;
 
-mod user;
+use crate::help::Help;
+use crate::user::User;
+
+pub(crate) mod help;
+mod utils;
+
+pub(crate) mod user;
 
 #[wasm_bindgen]
 pub fn start() {
