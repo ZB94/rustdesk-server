@@ -3,8 +3,10 @@ extern crate serde;
 #[macro_use]
 extern crate serde_json;
 
+mod help;
 mod utils;
 
+use crate::help::Help;
 use crate::user::User;
 use eframe::egui::{CentralPanel, Context, FontData, FontDefinitions, Ui};
 use eframe::{App, CreationContext, Frame};
@@ -27,6 +29,7 @@ pub fn start() {
 pub struct Application {
     load_font: bool,
     user: User,
+    help: Help,
 }
 
 impl App for Application {
@@ -37,6 +40,8 @@ impl App for Application {
 
         ctx.request_repaint();
         CentralPanel::default().show(ctx, |ui| {
+            ui.add(&mut self.help);
+
             self.user.ui(ui);
         });
     }
@@ -47,6 +52,7 @@ impl Application {
         Self {
             load_font: false,
             user: User::new(),
+            help: Help::new(),
         }
     }
 
