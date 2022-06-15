@@ -7,8 +7,9 @@ edition = "2021"
 
 [dependencies]
 axum = "0.5"
-#axum-extra = { version = "0.3", features = ["spa"] }
-tower-http = { version = "0.3", features= ["fs"] }
+axum-server = { version = "0.4", features = ["tls-rustls"] }
+rustls = { version = "0.20", features = ["dangerous_configuration"] }
+tower-http = { version = "0.3", features = ["fs", "compression-full"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "fs"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

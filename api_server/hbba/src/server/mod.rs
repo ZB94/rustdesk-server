@@ -6,6 +6,7 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{delete, get, get_service, post, put};
 use axum::Extension;
+use axum_server::tls_rustls::RustlsConfig;
 use serde::Serialize;
 use tokio::sync::RwLock;
 
@@ -17,13 +18,25 @@ pub mod manage;
 pub mod user;
 
 pub async fn start(
-    bind: &SocketAddr,
+    cert_path: String,
+    key_path: String,
+    bind: SocketAddr,
     pool: DbPool,
     static_dir: Option<String>,
     download_dir: Option<String>,
     server_address: ServerAddress,
 ) -> Result<(), axum::BoxError> {
-    let mut router = axum::Router::new();
+    let config = RustlsConfig::from_pem_file(&cert_path, &key_path)
+        .await
+        .expect("tls初始化失败");
+
+    let mut router = axum::Router::new().route(
+        "/api_server.crt",
+        get_service(tower_http::services::ServeFile::new(cert_path))
+            .handle_error(|_| ready(StatusCode::INTERNAL_SERVER_ERROR)),
+    );
+
+    let layer_compression = static_dir.is_some() || download_dir.is_some();
 
     if let Some(d) = static_dir {
         debug!("static dir: {}", &d);
@@ -79,6 +92,10 @@ pub async fn start(
             .layer(Extension(Arc::new(downloads)));
     }
 
+    if layer_compression {
+        router = router.layer(tower_http::compression::CompressionLayer::new());
+    }
+
     router = router
         .route("/api/login", post(user::login))
         .route("/api/logout", post(user::logout))
@@ -96,7 +113,7 @@ pub async fn start(
         .layer(Extension(Arc::new(RwLock::new(server_address))))
         .layer(Extension(pool));
 
-    axum::Server::bind(bind)
+    axum_server::bind_rustls(bind, config)
         .serve(router.into_make_service())
         .await?;
 

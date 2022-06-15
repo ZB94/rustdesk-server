@@ -85,7 +85,7 @@ impl User {
             .resizable(false)
             .show(ui.ctx(), |ui| {
                 Grid::new("server address")
-                    .spacing([4.0, 8.0])
+                    .spacing([16.0, 8.0])
                     .max_col_width(400.0)
                     .show(ui, |ui| {
                         if let Some(server) = &mut self.server_address.1 {
@@ -107,6 +107,11 @@ impl User {
                                 }
                                 ui.end_row();
                             }
+
+                            ui.label("API服务器证书下载");
+                            ui.hyperlink_to("点击下载", "/api_server.crt");
+                            ui.end_row();
+
                             if admin {
                                 ui.label("");
                                 let change = ui

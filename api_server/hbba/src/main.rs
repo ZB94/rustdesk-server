@@ -32,7 +32,9 @@ async fn main() {
         .expect("服务器配置加载失败");
 
     server::start(
-        &args.bind,
+        args.cert_path,
+        args.key_path,
+        args.bind,
         pool,
         args.static_dir,
         args.download_dir,
@@ -45,6 +47,10 @@ async fn main() {
 #[derive(Debug, Parser)]
 #[clap(author, version)]
 pub struct Args {
+    /// cert pem file path
+    pub cert_path: String,
+    /// key pem file path
+    pub key_path: String,
     /// 服务监听地址
     #[clap(long, short, default_value = "0.0.0.0:21114")]
     pub bind: SocketAddr,
