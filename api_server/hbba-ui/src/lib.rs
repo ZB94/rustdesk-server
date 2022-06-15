@@ -47,10 +47,12 @@ impl App for Application {
         }
 
         CentralPanel::default().show(ctx, |ui| {
-            ScrollArea::new([true, true]).show(ui, |ui| {
-                ui.add(Help);
-                self.user.ui(ui);
-            });
+            ScrollArea::both()
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    ui.add(Help);
+                    self.user.ui(ui);
+                });
         });
 
         ctx.request_repaint();
