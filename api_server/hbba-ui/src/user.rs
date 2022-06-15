@@ -109,7 +109,11 @@ impl User {
                             }
 
                             ui.label("API服务器证书下载");
-                            ui.hyperlink_to("点击下载", "/api_server.crt");
+                            ui.hyperlink_to("点击下载", "/api_server.crt")
+                                .on_hover_ui(|ui| {
+                                    ui.label("对于Windows系统，请下载后双击证书安装到系统，并选择将证书存储于'受信任的根证书颁发机构'");
+                                    ui.label("对于Linux系统，请将证书保存于'/etc/ssl/certs'目录中（仅在Ubuntu下测试过）");
+                                });
                             ui.end_row();
 
                             if admin {
