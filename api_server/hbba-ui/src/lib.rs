@@ -2,6 +2,9 @@
 extern crate serde;
 #[macro_use]
 extern crate serde_json;
+#[cfg(feature = "log")]
+#[macro_use]
+extern crate tracing;
 
 use std::sync::RwLock;
 
@@ -21,6 +24,10 @@ pub(crate) mod user;
 #[wasm_bindgen]
 pub fn start() {
     utils::set_panic_hook();
+
+    #[cfg(feature = "log")]
+    tracing_wasm::set_as_global_default();
+
     eframe::start_web(
         "view",
         Box::new(|ctx: &CreationContext| Box::new(Application::new(ctx))),
@@ -39,13 +46,14 @@ impl App for Application {
             return;
         }
 
-        ctx.request_repaint();
         CentralPanel::default().show(ctx, |ui| {
             ScrollArea::new([true, true]).show(ui, |ui| {
                 ui.add(Help);
                 self.user.ui(ui);
             });
         });
+
+        ctx.request_repaint();
     }
 }
 

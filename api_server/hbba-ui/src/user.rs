@@ -43,7 +43,7 @@ impl User {
             refer_user: None,
             chanel: unbounded(),
             message: Vec::with_capacity(5),
-            server_address: (Instant::now() - Duration::from_secs(1), None),
+            server_address: (Instant::now(), None),
         }
     }
 
@@ -54,7 +54,7 @@ impl User {
         self.create_user = Default::default();
         self.users.clear();
         self.refer_user = None;
-        self.server_address = (Instant::now() - Duration::from_secs(1), None);
+        self.server_address = (Instant::now(), None);
         self.access_token = None;
     }
 
